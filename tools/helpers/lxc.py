@@ -339,7 +339,7 @@ def make_base_props(args):
 
     # Generate necessary dalvik_dex2oat props which are used to dex2oat background compile dex files based on CPU's core quantity
     cpus_count = os.cpu_count()
-    cpus_range = ",".join(map(str, range(cpus_count)))
+    cpus_range = ",".join(map(str, range(cpus_count/2)))
     dalvik_dex2oat = [
         f"dalvik.vm.background-dex2oat-cpu-set={cpus_range}",
         f"dalvik.vm.background-dex2oat-threads={cpus_count}",
