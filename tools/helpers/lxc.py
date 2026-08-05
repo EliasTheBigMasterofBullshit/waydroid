@@ -164,6 +164,9 @@ def set_lxc_config(args):
     tools.helpers.run.user(args, command)
     command = ["sed", "-i", "s/LXCARCH/{}/".format(platform.machine()), lxc_path + "/config"]
     tools.helpers.run.user(args, command)
+    post_stop_script = tools.config.tools_src + "/data/scripts/waydroid-post-stop.sh"
+    command = ["sed", "-i", "s#LXCPOSTSTOP#{}#".format(post_stop_script), lxc_path + "/config"]
+    tools.helpers.run.user(args, command)
     command = ["cp", "-fpr", seccomp_profile, lxc_path + "/waydroid.seccomp"]
     tools.helpers.run.user(args, command)
     if get_apparmor_status(args):
@@ -243,6 +246,16 @@ def make_base_props(args):
         except Exception:
             return False
 
+    def find_aidl(intf):
+        if args.vendor_type == "MAINLINE":
+            return False
+
+        try:
+            sm = gbinder.ServiceManager("/dev/binder")
+            return intf in sm.list_sync()
+        except Exception:
+            return False
+
     props = []
 
     if not os.path.exists("/dev/ashmem"):
@@ -258,6 +271,8 @@ def make_base_props(args):
     gralloc = find_hal("gralloc")
     if not gralloc:
         if find_hidl("android.hardware.graphics.allocator@4.0::IAllocator/default"):
+            gralloc = "android"
+        elif find_aidl("android.hardware.graphics.allocator.IAllocator/default"):
             gralloc = "android"
     if not gralloc:
         if dri:
@@ -308,6 +323,11 @@ def make_base_props(args):
     if opengles == "":
         opengles = "196610"
     props.append("ro.opengles.version=" + opengles)
+
+    # Some Mali devices require ro.vendor.arm.egl.* props from the
+    # host for libEGL/GLES to work
+    for k, v in tools.helpers.props.host_list(args, "ro.vendor.arm.egl.").items():
+        props.append(k + "=" + v)
 
     if args.images_path not in tools.config.defaults["preinstalled_images_paths"]:
         props.append("waydroid.system_ota=" + args.system_ota)
